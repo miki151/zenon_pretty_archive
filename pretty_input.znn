@@ -21,7 +21,6 @@ export struct input_stream {
   vector<vector<input_stream_position>> positions;
   int index;
   vector<concept_mapping_info> concept_mapping;
-  vector<concept_default_mapping_info> concept_default_mapping;
 };
 
 using read_function_type = invoke<expected<box<any>, string>, input_stream mutable*>;
@@ -30,11 +29,7 @@ export struct concept_mapping_info {
   string concept_type_name;
   string mapped_type_name;
   box<read_function_type> read_function;
-};
-
-export struct concept_default_mapping_info {
-  string concept_type_name;
-  box<read_function_type> read_function;
+  bool pop_token;
 };
 
 export concept <T> read_data_overload {
@@ -42,28 +37,24 @@ export concept <T> read_data_overload {
 };
 
 export template <C, T> requires is_concept<C>, read_data_overload<T>
-void add_concept_default_mapping(input_stream mutable* stream) {
-  stream->concept_default_mapping.push_back(concept_default_mapping_info(
-    to_string(C),
-    [](input_stream mutable* stream) -> box<any>!string {
-      return (try stream^.read_data<T>()).box_as<C>().box_as<any>();
-    }.box_as<read_function_type>()
-  ));
-}
-
-export template <C, T> requires is_concept<C>, read_data_overload<T>
 void add_concept_mapping(input_stream mutable* stream) {
-  add_concept_mapping<C, T>(stream, to_string(T));
+  add_concept_mapping<C, T>(stream, to_string(T), false);
 }
 
 export template <C, T> requires is_concept<C>, read_data_overload<T>
 void add_concept_mapping(input_stream mutable* stream, string mapped_name) {
+  add_concept_mapping<C, T>(stream, mapped_name, false);
+}
+
+export template <C, T> requires is_concept<C>, read_data_overload<T>
+void add_concept_mapping(input_stream mutable* stream, string mapped_name, bool pop_token) {
   stream->concept_mapping.push_back(concept_mapping_info(
     to_string(C),
     mapped_name,
     [](input_stream mutable* stream) -> box<any>!string {
       return (try stream^.read_data<T>()).box_as<C>().box_as<any>();
-    }.box_as<read_function_type>()
+    }.box_as<read_function_type>(),
+    pop_token
   ));
 }
 
@@ -73,15 +64,10 @@ box<C>!string read_data(input_stream mutable* stream, pretty_dummy_struct<box<C>
   const mapped_name = stream^.read_string();
   for (mapping : stream^.concept_mapping)
     if (mapping->concept_type_name == to_string(C) && mapping->mapped_type_name == mapped_name) {
+      if (mapping->pop_token)
+        stream^.index = last_index;
       const box<any> a = try mapping->read_function^(stream);
       return *move(a).cast_to<box<C>>();
-    }
-  for (mapping : stream^.concept_default_mapping)
-    if (mapping->concept_type_name == to_string(C)) {
-      stream^.index = last_index;
-      const a = try mapping->read_function^(stream);
-      const b = move(a).cast_to<box<C>>();
-      return *move(b);
     }
   stream^.index = last_index;
   return stream^.get_error("Not an {to_string(C)} type: \"{mapped_name}\"");
@@ -91,8 +77,7 @@ export input_stream!string create_input_stream(string s) {
   const positions = try preprocess(s);
   const content = positions.content;
   printf("After prep:\n{content}\n===\n");
-  return input_stream(move(content), move(positions).positions, 0, vector<concept_mapping_info>(),
-        vector<concept_default_mapping_info>());
+  return input_stream(move(content), move(positions).positions, 0, vector<concept_mapping_info>());
 }
 
 export template <T>
