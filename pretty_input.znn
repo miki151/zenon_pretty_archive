@@ -3,6 +3,7 @@ export import "std/expected.znn";
 export import "std/io.znn";
 import "std/char.znn";
 export import "std/vector.znn";
+export import "std/enum_set.znn";
 export import "std/hash_map.znn";
 export import "std/enum.znn";
 export import "std/range.znn";
@@ -76,7 +77,7 @@ box<C>!string read_data(input_stream mutable* stream, pretty_dummy_struct<box<C>
 export input_stream!string create_input_stream(string s) {
   const positions = try preprocess(s);
   const content = positions.content;
-  printf("After prep:\n{content}\n===\n");
+//  printf("After prep:\n{content}\n===\n");
   return input_stream(move(content), move(positions).positions, 0, vector<concept_mapping_info>());
 }
 
@@ -311,6 +312,18 @@ vector<T>!string read_data(input_stream mutable* stream, pretty_dummy_struct<vec
     if (stream^.expect("\}"))
       break;
     ret.push_back(try stream^.read_data<T>());
+  }
+  return move(ret);
+}
+
+export template <T> requires read_data_overload<T>, is_enum<T>
+enum_set<T>!string read_data(input_stream mutable* stream, pretty_dummy_struct<enum_set<T>>) {
+  try stream^.expect("\{");
+  mutable ret = enum_set<T>();
+  while (true) {
+    if (stream^.expect("\}"))
+      break;
+    ret.set(try stream^.read_data<T>());
   }
   return move(ret);
 }
