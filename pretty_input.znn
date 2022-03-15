@@ -4,6 +4,7 @@ export import "std/io.znn";
 import "std/char.znn";
 export import "std/vector.znn";
 export import "std/enum_set.znn";
+export import "std/enum_map.znn";
 export import "std/hash_map.znn";
 export import "std/enum.znn";
 export import "std/range.znn";
@@ -326,6 +327,12 @@ enum_set<T>!string read_data(input_stream mutable* stream, pretty_dummy_struct<e
     ret.set(try stream^.read_data<T>());
   }
   return move(ret);
+}
+
+export template <T, U> requires read_data_overload<T>, is_enum<T>, copy<U>
+enum_map<T, U>!string read_data(input_stream mutable* stream, pretty_dummy_struct<enum_map<T, U>>) {
+  const m = try stream^.read_data<hash_map<T, U>>();
+  return enum_map_generate([&](T key) { return m.get(&key)^.copy(); });
 }
 
 export template <T> requires read_data_overload<T>
