@@ -50,7 +50,7 @@ void add_concept_mapping(input_stream mutable* stream, string mapped_name) {
 
 export template <C, T> requires is_concept<C>, read_data_overload<T>
 void add_concept_mapping(input_stream mutable* stream, string mapped_name, bool pop_token) {
-  stream->concept_mapping.push_back(concept_mapping_info(
+  stream^.concept_mapping.push_back(concept_mapping_info(
     to_string(C),
     mapped_name,
     [](input_stream mutable* stream) -> box<any>!string {
@@ -65,10 +65,10 @@ box<C>!string read_data(input_stream mutable* stream, pretty_dummy_struct<box<C>
   const last_index = stream^.index;
   const mapped_name = stream^.read_string();
   for (mapping : stream^.concept_mapping)
-    if (mapping->concept_type_name == to_string(C) && mapping->mapped_type_name == mapped_name) {
-      if (mapping->pop_token)
+    if (mapping^.concept_type_name == to_string(C) && mapping^.mapped_type_name == mapped_name) {
+      if (mapping^.pop_token)
         stream^.index = last_index;
-      const box<any> a = try mapping->read_function^(stream);
+      const box<any> a = try mapping^.read_function^(stream);
       return *move(a).cast_to<box<C>>();
     }
   stream^.index = last_index;
