@@ -132,7 +132,7 @@ T!string read_named_fields(pretty_dummy_struct<T>, input_stream mutable* stream)
     "while (true) \{ const id = stream^.read_string(); if (id == \")\") break;try stream^.expect(\"=\");";
   static for (i = 0; i < struct_count(T); ++i)
     stmt = stmt +
-        "if (id == \"" + get_member_name(T, i) + "\") elem" + to_string(i) + " = try stream^.read_data<" + 
+        "if (id == \"" + get_member_name(T, i) + "\") elem" + to_string(i) + " = try stream^.read_data<" +
         to_string(get_member_type(T, i)) + ">();";
   stmt = stmt + "\}";
   static for (i = 0; i < struct_count(T); ++i)
@@ -162,13 +162,22 @@ T!string read_data(input_stream mutable* stream, pretty_dummy_struct<T>) {
       return read_named_fields(pretty_dummy_struct<T>(), stream);
   }
   static for (i = 0; i < struct_count(T); ++i) {
+    static const memberType = to_string(get_member_type(T, i));
+    readStmt = readStmt + "mutable " + memberType + " ? elem" + to_string(i) +
+        " = getDefaultValue(pretty_member_dummy<" +
+            to_string(T) + ", " + memberType + ", " + to_string(i) + ">());";
+    static const assignStmt = "elem" + to_string(i) + " = try read_data<" + memberType + ">(stream);";
     static if (i > 0) {
       returnStmt = returnStmt + ", ";
-      readStmt = readStmt + "try parse_bracket<T>(stream, bracket_to_parse::COMMA);";
-    }
-    readStmt = readStmt +
-        "const elem" + to_string(i) + " = try read_data<$get_member_type(" + to_string(T) + ", " + to_string(i) + ")>(stream);";
-    returnStmt = returnStmt + "move(elem" + to_string(i) + ")";
+      readStmt = readStmt + "if (stream^.peek_string() != \")\") \{" +
+          "try parse_bracket<T>(stream, bracket_to_parse::COMMA);" +
+          assignStmt +
+          "\}";
+    } else
+      readStmt = readStmt + "if (stream^.peek_string() != \")\")" + assignStmt;
+    readStmt = readStmt + "if (!elem" + to_string(i) + ")" +
+        "return stream^.get_error(\"Field " + get_member_name(T, i) + " is mandatory\");";
+    returnStmt = returnStmt + "*move(elem" + to_string(i) + ")";
   }
   readStmt = readStmt + "try parse_bracket<T>(stream, bracket_to_parse::CLOSE);";
   mixin "\{" + readStmt + returnStmt + ");\}";
