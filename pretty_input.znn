@@ -19,9 +19,9 @@ export struct input_stream_position {
 };
 
 export struct input_stream {
-  string buffer;
   vector<vector<input_stream_position>> positions;
-  int index;
+  string_iterator index;
+  string_iterator buffer_end;
   vector<concept_mapping_info> concept_mapping;
 };
 
@@ -78,8 +78,8 @@ box<C>!string read_data(input_stream mutable* stream, pretty_dummy_struct<box<C>
 export input_stream!string create_input_stream(string s) {
   const positions = try preprocess(s);
   const content = positions.content;
-//  printf("After prep:\n{content}\n===\n");
-  return input_stream(move(content), move(positions).positions, 0, vector<concept_mapping_info>());
+  //printf("After prep:\n{content}\n===\n");
+  return input_stream(move(positions).positions, content.begin(), content.end(), vector<concept_mapping_info>());
 }
 
 export template <T>
@@ -200,29 +200,32 @@ T!string read_data(input_stream mutable* stream, pretty_dummy_struct<T>) {
 }
 
 char get_char(input_stream mutable* stream) {
-  return stream^.buffer[stream^.index];
+  return *stream^.index;
 }
 
 export string peek_string(input_stream mutable* stream) {
-  while (stream^.get_char().isspace())
-    ++stream^.index;
+  while (stream^.index != stream^.buffer_end && stream^.get_char().isspace())
+    discard ++stream^.index;
+  if (stream^.index == stream^.buffer_end)
+    return "EOF";
   char next = stream^.get_char();
   if (next == '"')
     return "{next}";
   mutable end = stream^.index;
-  while (end < stream^.buffer.size() && !stream^.buffer[end].isspace())
-    ++end;
-  return stream^.buffer.substring(stream^.index, end - stream^.index);
+  while (end != stream^.buffer_end && !end^.isspace())
+    discard ++end;
+  return stream^.index.substring(end);
 }
 
 export string read_string(input_stream mutable* stream) {
   const ret = stream^.peek_string();
-  stream^.index += ret.size();
+  for (i : range(0, ret.size()))
+    discard ++stream^.index;
   return move(ret);
 }
 
 export string get_error(input_stream* stream, string error) {
-  const pos = &stream^.positions[stream^.index][0];
+  const pos = &stream^.positions[stream^.index.index][0];
   return "Line {pos^.line}, column {pos^.column}: {error}";
 }
 
@@ -282,18 +285,16 @@ export char!string read_data(input_stream mutable* stream, pretty_dummy_struct<c
 
 export string!string read_data(input_stream mutable* stream, pretty_dummy_struct<string>) {
   mutable ret = "";
-  while (stream^.get_char().isspace())
-    ++stream^.index;
   if (const res = stream^.expect("\""); !res)
     return expected<string, string>::error(res.get_error());
   while (true) {
     const c = stream^.get_char();
     if (c == '"') {
-      ++stream^.index;
+      discard ++stream^.index;
       break;
     }
     ret += "{c}";
-    ++stream^.index;
+    discard ++stream^.index;
   }
   return expected<string, string>::value(move(ret));
 }
