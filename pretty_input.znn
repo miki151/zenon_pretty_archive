@@ -112,9 +112,9 @@ T!string read_named_fields(pretty_dummy_struct<T>, input_stream mutable* stream)
   static mutable stmt = "";
   static for (i = 0; i < struct_count(T); ++i) {
     static const memberType = to_string(get_member_type(T, i));
-    stmt = stmt + "mutable " + memberType + " ? elem" + to_string(i) + " = null;";
+    stmt += "mutable " + memberType + " ? elem" + to_string(i) + " = null;";
   }
-  stmt = stmt +
+  stmt +=
     "mutable argNum = 0;" +
     "while (true) \{" +
     "if (round_brackets(pretty_dummy_struct<T>()) && !!stream^.expect(\")\") || argNum >= " + to_string(struct_count(T)) + ")" +
@@ -125,31 +125,31 @@ T!string read_named_fields(pretty_dummy_struct<T>, input_stream mutable* stream)
       "id = null;" +
       "stream^.index = beginArg;\}";
   static for (i = 0; i < struct_count(T); ++i)
-    stmt = stmt + "if (id == \"" + get_member_name(T, i) + "\" || (!id && argNum == " + to_string(i) + "))" +
+    stmt += "if (id == \"" + get_member_name(T, i) + "\" || (!id && argNum == " + to_string(i) + "))" +
         "elem" + to_string(i) + " = try stream^.read_data<" +
           to_string(get_member_type(T, i)) + ">();";
-  stmt = stmt + "discard parse_bracket<T>(stream, bracket_to_parse::COMMA);" +
+  stmt += "discard parse_bracket<T>(stream, bracket_to_parse::COMMA);" +
     "++argNum;\}";
   static for (i = 0; i < struct_count(T); ++i)
     static if (!member_has_default_value(T, i))
-      stmt = stmt + "if (!elem" + to_string(i) + ")"  +
+      stmt += "if (!elem" + to_string(i) + ")"  +
           "return stream^.get_error(\"Field " + get_member_name(T, i) + " is required\");";
-  stmt = stmt + "mutable ret = " + to_string(T) + "::" + to_string(T) + "(";
+  stmt += "mutable ret = " + to_string(T) + "::" + to_string(T) + "(";
   static mutable addComma = false;
   static for (i = 0; i < struct_count(T); ++i)
     static if (!member_has_default_value(T, i)) {
       static if (!!addComma) {
-        stmt = stmt + ", ";
+        stmt += ", ";
       }
-      stmt = stmt + "." + get_member_name(T, i) + " = *move(elem" + to_string(i) + ")";
+      stmt += "." + get_member_name(T, i) + " = *move(elem" + to_string(i) + ")";
       addComma = true;
     }
-  stmt = stmt + ");";
+  stmt += ");";
   static for (i = 0; i < struct_count(T); ++i)
     static if (member_has_default_value(T, i))
-      stmt = stmt + "if (!!elem" + to_string(i) + ")"
+      stmt += "if (!!elem" + to_string(i) + ")"
           + "ret." + get_member_name(T, i) + " = *move(elem" + to_string(i) + ");";
-  stmt = stmt + "return move(ret);";
+  stmt += "return move(ret);";
   mixin "\{" + stmt + "\}";
 }
 
