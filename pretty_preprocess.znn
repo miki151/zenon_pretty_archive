@@ -32,8 +32,8 @@ string get_pos_error(vector<input_stream_position>* positions, string message) {
 bool contains(vector<StreamChar>* a, string substring, int index) {
   if (a^.size() - index < substring.size())
     return false;
-  for (i = index; i < index + substring.size(); ++i)
-    if ((*a)[i].c != substring[i - index])
+  for (c : substring)
+    if (*c != (*a)[c.index + index].c)
       return false;
   return true;
 }
@@ -236,9 +236,10 @@ vector<StreamChar> removeFormatting(string contents) {
   };
   mutable cur = input_stream_position(1, 1);
   mutable inQuote = false;
+  mutable prev = ' ';
   for (it : contents) {
     mutable addSpace = false;
-    if (*it == '"' && (it.index == 0 || contents[it.index - 1] != '\\')) {
+    if (*it == '"' && (it.index == 0 || prev != '\\')) {
       inQuote = !inQuote;
       if (inQuote) {
         addChar(cur, ' ');
@@ -264,6 +265,7 @@ vector<StreamChar> removeFormatting(string contents) {
       cur.column = 1;
     } else
       ++cur.column;
+    prev = *it;
   }
   return move(ret);
 }
