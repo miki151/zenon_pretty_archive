@@ -21,8 +21,8 @@ export struct input_stream_position {
 
 export struct input_stream {
   vector<vector<input_stream_position>> positions;
+  string buffer;
   string_iterator index;
-  string_iterator buffer_end;
   vector<concept_mapping_info> concept_mapping;
 };
 
@@ -80,7 +80,7 @@ export input_stream!string create_input_stream(string s) {
   const positions = try preprocess(s);
   const content = positions.content;
   //printf("After prep:\n{content}\n===\n");
-  return input_stream(move(positions).positions, content.begin(), content.end(), vector<concept_mapping_info>());
+  return input_stream(move(positions).positions, content, content.begin(), vector<concept_mapping_info>());
 }
 
 export template <T>
@@ -189,23 +189,23 @@ char get_char(input_stream mutable* stream) {
 }
 
 export string peek_string(input_stream mutable* stream) {
-  while (stream^.index != stream^.buffer_end && stream^.get_char().isspace())
-    discard ++stream^.index;
-  if (stream^.index == stream^.buffer_end)
+  while (stream^.index != stream^.buffer.end() && stream^.get_char().isspace())
+    ++stream^.index;
+  if (stream^.index == stream^.buffer.end())
     return "EOF";
   char next = stream^.get_char();
   if (next == '"')
     return "{next}";
   mutable end = stream^.index;
-  while (end != stream^.buffer_end && !end^.isspace())
-    discard ++end;
-  return stream^.index.substring(end);
+  while (end != stream^.buffer.end() && !end^.isspace())
+    ++end;
+  return stream^.buffer.substring(stream^.index, end);
 }
 
 export string read_string(input_stream mutable* stream) {
   const ret = stream^.peek_string();
   for (i : range(0, ret.size()))
-    discard ++stream^.index;
+    ++stream^.index;
   return move(ret);
 }
 
